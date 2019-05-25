@@ -33,7 +33,7 @@ function cloneAppiumRepo(): void {
 
 }
 
-function getDocLastVersion(file): string {
+function getDocLastVersion(file: string): string {
     let listLine = fs.readFileSync(path.join(__dirname, config.docPath, file)).toString().split('\n').slice(-2)[0];
     if (listLine.startsWith('Last english version: ')) return listLine.substr(22, 40);
 
@@ -42,7 +42,7 @@ function getDocLastVersion(file): string {
 
 }
 
-function getFileLastCommit(file): string {
+function getFileLastCommit(file: string): string {
     return execSync('git log --pretty=oneline docs/' + file, { cwd : path.join(__dirname, config.repoPath) })
         .toString().substr(0, 40);
 }
@@ -50,15 +50,17 @@ function getFileLastCommit(file): string {
 function parseToc(origin: string): object {
     const toc = require(path.join(__dirname, config.docPath, 'toc.js'));
 
-    function _expandArray(array, pathPrefix: string): object {
+    function _expandArray(array: any, pathPrefix: string): object {
         let result = {};
 
         for (let item of array) {
             if (item[0] === 'Home' || typeof item === 'string') continue;
             if (typeof item[1] === 'string') {
+                // @ts-ignore
                 result[item[0]] = pathPrefix + '/' + item[1];
             } else {
                 let _pathPrefix = pathPrefix + '/' + item[1][0];
+                // @ts-ignore
                 result[item[0]] = Object.assign(_expandArray(item[1], _pathPrefix), { _dir : _pathPrefix });
             }
         }
@@ -69,9 +71,9 @@ function parseToc(origin: string): object {
     return _expandArray(toc[origin], '');
 }
 
-function showToc(tocOrigin, tocTarget, originLang, targetLang) {
+function showToc(tocOrigin: any, tocTarget: any, originLang: string, targetLang: string) {
 
-    function _expandObject(object, layerNumber) {
+    function _expandObject(object: any, layerNumber: number): string[][] {
 
         let result = [];
 
@@ -101,7 +103,7 @@ function showToc(tocOrigin, tocTarget, originLang, targetLang) {
         _target = _expandObject(tocTarget, 0);
     }
 
-    let _targetObj = {};
+    let _targetObj: any = {};
     for (let x of _target) {
         _targetObj[x[1]] = x[0];
     }
@@ -141,6 +143,7 @@ function showToc(tocOrigin, tocTarget, originLang, targetLang) {
         data.push([originName, targetName, status, originVersion, targetVersion, docPath]);
     }
 
+    // @ts-ignore
     output = table(data, { singleLine : true });
     console.log(output);
     console.log('You can use ` appium-doc -a` to shows that all the documents. But we recommended to use `appium-doc' + ' commands` view the \'doc-commands\' section.\n');
