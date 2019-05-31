@@ -33,18 +33,38 @@ function cloneAppiumRepo(): void {
 
 }
 
-function getDocLastVersion(file: string): string {
+function getDocLastVersionInfo_Hash(file: string): string {
     let listLine = fs.readFileSync(path.join(__dirname, config.docPath, file)).toString().split('\n').slice(-2)[0];
     if (listLine.startsWith('Last english version: ')) return listLine.substr(22, 40);
 
     return ' ';
-
-
 }
 
-function getFileLastCommit(file: string): string {
+function getDocLastVersionInfo(file: string): any {
+    let listLine = fs.readFileSync(path.join(__dirname, config.docPath, file)).toString().split('\n').slice(-2)[0];
+    if (!listLine.startsWith('Last english version: ')) return null;
+
+    return {
+        lastVersion : listLine.substr(22, 40),
+        lastVersionDate : listLine.substr(63).trim(),
+    };
+}
+
+function getFileLastCommitInfo_Hash(file: string): string {
     return execSync('git log --pretty=oneline docs/' + file, { cwd : path.join(__dirname, config.repoPath) })
         .toString().substr(0, 40);
+}
+
+function getFileLastCommitInfo(file: string): any {
+    let logLine = execSync('git log docs/' + file, { cwd : path.join(__dirname, config.repoPath) })
+        .toString().split('\n');
+
+    let date = logLine[2].split(' ');
+
+    return {
+        lastVersion : logLine[0].split(' ')[1],
+        lastVersionDate : `${date[4]} ${date[5]}, ${date[7]}`,
+    };
 }
 
 function parseToc(origin: string): object {
@@ -125,10 +145,10 @@ function showToc(tocOrigin: any, tocTarget: any, originLang: string, targetLang:
         } else if (_targetObj[item[1]] === undefined) {
             status = 'Unlink  \x1b[91m◉\x1b[39m';
         } else {
-            originVersion = getFileLastCommit(originLang + docPath);
+            originVersion = getFileLastCommitInfo_Hash(originLang + docPath);
             if (!fs.existsSync(path.join(__dirname, config.docPath, targetLang + docPath))) {
                 status = 'HangUp  \x1b[91m◉\x1b[39m';
-            } else if (originVersion === (targetVersion = getDocLastVersion(targetLang + docPath))) {
+            } else if (originVersion === (targetVersion = getDocLastVersionInfo_Hash(targetLang + docPath))) {
                 status = 'Done    \x1b[92m✔\x1b[39m';
             } else {
                 status = 'Expired \x1b[93m⬆\x1b[39m';
@@ -149,20 +169,77 @@ function showToc(tocOrigin: any, tocTarget: any, originLang: string, targetLang:
     console.log('You can use ` appium-doc -a` to shows that all the documents. But we recommended to use `appium-doc' + ' commands` view the \'doc-commands\' section.\n');
 }
 
+function showDocInfo(docId: string) {
+
+    let info = makeDocInfo(docId);
+
+    let data = [];
+    for (let lang in info) {
+        data.push([lang, info[lang].docName, info[lang].lastVersionDate, info[lang].lastVersion, info[lang].url]);
+    }
+
+    // console.log(info.en.lastVersion);
+
+    // @ts-ignore
+    console.log(table(data, { singleLine : true }));
+}
+
+function findDocName_byDocId(toc: any, docId: string): string {
+    for (let key in toc) {
+        if (toc[key] === docId) return key;
+        if (typeof toc === 'object') {
+            let sub = findDocName_byDocId(toc[key], docId);
+            if (sub !== null) return sub;
+        }
+    }
+
+    return null;
+}
+
+function makeDocInfo(docId: string): any {
+
+    let info: any = {
+        en : {
+            docName : findDocName_byDocId(parseToc('en'), docId),
+        },
+        [config.targetLang] : {
+            docName : findDocName_byDocId(parseToc(config.targetLang), docId),
+        },
+    };
+
+    Object.assign(info.en, getFileLastCommitInfo('en' + docId));
+    Object.assign(info[config.targetLang], getDocLastVersionInfo(config.targetLang + docId));
+
+    info.en.url = config.repoUrl.substring(0, config.repoUrl.length - 4) + '/blob/' + info.en.lastVersion + '/docs/' + 'en' + docId;
+    info[config.targetLang].url = config.repoUrl.substring(0, config.repoUrl.length - 4) + '/tree/master/docs/' + config.targetLang + docId;
+
+    return info;
+}
+
 program
     .version('0.0.0')
     .option('-L, --long-hash', 'Displays the full commit hash.')
     .option('-a, --show-commands', 'Displays the full document.')
     .option('-c, --only-show-commands', 'Display only the commands document.')
     .option('-t, --target-lang [lang]', `The language to be translated. default's cn`)
-    .parse(process.argv);
+    .option('-s, --show-doc [docId]', 'Show document info')
+    .action(() => {
 
-if (program.longHash) config.longHash = true;
-if (program.showCommands) config.showCommands = true;
-if (typeof program.targetLang === 'string') config.targetLang = program.targetLang;
-if (program.onlyShowCommands) {
-    config.onlyShowCommands = true;
-    config.showCommands = true;
-}
+        if (program.showDoc) {
+            showDocInfo(program.showDoc);
+            return;
+        }
 
-main();
+        if (program.longHash) config.longHash = true;
+        if (program.showCommands) config.showCommands = true;
+        if (typeof program.targetLang === 'string') config.targetLang = program.targetLang;
+        if (program.onlyShowCommands) {
+            config.onlyShowCommands = true;
+            config.showCommands = true;
+        }
+
+        main();
+    });
+
+
+program.parse(process.argv);

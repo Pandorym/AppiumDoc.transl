@@ -20,5 +20,6 @@ Options:
   -a, --show-commands       Displays the full document.
   -c, --only-show-commands  Display only the commands document.
   -t, --target-lang [lang]  The language to be translated. default's cn
+  -s, --show-doc [docId]    Show document info
   -h, --help                output usage information
 ```
